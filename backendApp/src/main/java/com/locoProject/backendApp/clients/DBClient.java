@@ -1,44 +1,43 @@
 package com.locoProject.backendApp.clients;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.locoProject.backendApp.models.TransactionDto;
-import org.apache.catalina.mbeans.SparseUserDatabaseMBean;
 import org.springframework.context.annotation.Scope;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @Scope("singleton")
 public class DBClient implements dbInterface{
-    Map<Long, Record> IDstore;
-    Map<String,List<Long>> TYPEstore;
+    Map<Long, Record> records;
+    Map<String,List<Long>> typeFieldIndex;
 
     public DBClient(){
-        this.IDstore = new HashMap<>();
-        this.TYPEstore = new HashMap<>();
+        this.records = new HashMap<>();
+        this.typeFieldIndex = new HashMap<>();
     }
 
     @Override
     public String put(Long id, TransactionDto dto) {
-        if(IDstore.containsKey(id)) throw new IllegalArgumentException("Cannot add the same ID again.");
-        if(!(dto.parentId==null || IDstore.containsKey(dto.parentId)))
+        if(records.containsKey(id)) throw new IllegalArgumentException("Cannot add the same ID again.");
+        if(!(dto.parentId==null || records.containsKey(dto.parentId)))
             throw new IllegalArgumentException("Cannot add data as Parent not present.");
 
-        IDstore.put(id, new Record(dto.type, dto.amount, dto.parentId));
-        List<Long> typeIds = TYPEstore.getOrDefault(dto.type, new ArrayList<>());
-        TYPEstore.put(dto.type, typeIds);
+        // Add in main db;
+        records.put(id, new Record(dto.type, dto.amount, dto.parentId, new ArrayList<>()));
+        // Update parent Entry
+        if(dto.parentId!=null) records.get(dto.parentId).children.add(id);
+        // Update typeField Index
+        List<Long> typeIds = typeFieldIndex.getOrDefault(dto.type, new ArrayList<>());
+        typeIds.add(id);
+        typeFieldIndex.put(dto.type, typeIds);
         return "Success";
     }
 
     @Override
     public TransactionDto get(Long id) {
-        if(!IDstore.containsKey(id)) throw new IllegalArgumentException("This Id is not Present.");
-        Record r = IDstore.get(id);
+        if(!records.containsKey(id)) throw new IllegalArgumentException("This Id is not Present.");
+        Record r = records.get(id);
         TransactionDto t = new TransactionDto();
         t.type = r.type;
         t.amount = r.amount;
@@ -48,32 +47,21 @@ public class DBClient implements dbInterface{
 
     @Override
     public List<Long> getType(String type) {
-        return TYPEstore.getOrDefault(type, new ArrayList<>());
+        return typeFieldIndex.getOrDefault(type, new ArrayList<>());
     }
 
     @Override
-    public Long getSum(Long id) {
-        Long curId = id;
-        Long sum = 0L;
-        while(curId!=null){
-            if(IDstore.containsKey(curId)){
-                Record r = IDstore.get(curId);
-                sum += r.amount;
-                curId = r.parentId;
-            }
-            else{
-                throw new IllegalArgumentException("Id: " + curId + " is not Present.");
-            }
-        }
-        return sum;
+    public List<Long> getChildren(Long id) {
+        return records.get(id).children;
     }
 
-    public class Record{
+    private class Record{
 
-        public Record(String type, Long amount, Long parentId){
+        public Record(String type, Long amount, Long parentId, List<Long> children){
             this.type = type;
             this.amount = amount;
             this.parentId = parentId;
+            this.children = children;
         }
 
         String type;
@@ -81,5 +69,7 @@ public class DBClient implements dbInterface{
         Long amount;
 
         Long parentId;
+
+        List<Long> children;
     }
 }

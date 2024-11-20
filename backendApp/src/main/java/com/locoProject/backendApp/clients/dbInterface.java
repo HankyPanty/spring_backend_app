@@ -13,5 +13,5 @@ public interface dbInterface {
 
     public List<Long> getType(String type);
 
-    public Long getSum(Long id);
+    public List<Long> getChildren(Long id);
 }

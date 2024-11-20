@@ -5,6 +5,8 @@ import com.locoProject.backendApp.models.TransactionDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Stack;
+
 @Service
 public class FilterService implements ServiceInterface{
     @Autowired
@@ -17,7 +19,15 @@ public class FilterService implements ServiceInterface{
 
     @Override
     public String getTransactionsSum(Long id) {
-        return dbClient.getSum(id).toString();
+        Stack<Long> childs = new Stack<>();
+        childs.add(id);
+        Long sum = 0L;
+        while(!childs.isEmpty()){
+            Long curId = childs.pop();
+            sum += dbClient.get(curId).amount;
+            childs.addAll(dbClient.getChildren(curId));
+        }
+        return sum.toString();
     }
 
     @Override
